@@ -502,6 +502,45 @@ with col2:
 with col3:
     st.markdown("🔵 **Routers intermedios**")
 
+# =========================================================
+# LEYENDA
+# =========================================================
+
+st.divider()
+
+st.markdown("### Leyenda de la red")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("🟢 **H:** Nodo origen")
+
+with col2:
+    st.markdown("🟠 **B:** Nodo destino")
+
+with col3:
+    st.markdown("🔵 **Routers intermedios**")
+
+# =========================================================
+# LEYENDA
+# =========================================================
+
+st.divider()
+
+st.markdown("### Leyenda de la red")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("🟢 **H:** Nodo origen")
+
+with col2:
+    st.markdown("🟠 **B:** Nodo destino")
+
+with col3:
+    st.markdown("🔵 **Routers intermedios**")
+
 st.caption(
     "Laboratorio de optimalidad y Sink Tree · "
     "Modelo basado en Johal (2008)"
+)
