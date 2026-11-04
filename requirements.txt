@@ -2,3 +2,5 @@ streamlit>=1.50
 networkx
 plotly
 pandas
+streamlit-agraph
+
