@@ -1,5 +1,5 @@
 """Optimalidad y Sink Tree en Streamlit (modelo del informe, Johal 2008).
-Ejecutar: streamlit run app (1).py"""
+Ejecutar: streamlit run aplicación (1).py"""
 
 import networkx as nx
 import pandas as pd
