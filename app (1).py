@@ -139,9 +139,7 @@ st.markdown(
     "$$G = (V,E), \\quad H(P) = \\sum_{(i,j)\\in P} h_{ij}, h_{ij} = 1$$"
 )
 st.markdown(
-    "$$D(P) = \\sum d_{ij}, \\quad B(P) = \\min b_{ij}, \\quad C(P) ="
-    " \\sum \\left[\\alpha \\frac{d_{ij}}{d_{ref}} + \\gamma"
-    " \\frac{b_{ref}}{b_{ij}}\\right]$$"
+    "$$D(P) = \\sum d_{ij}, \\quad B(P) = \\min b_{ij}, \\quad C(P) =" " \\sum \\left[\\alpha \\frac{d_{ij}}{d_{ref}} + \\gamma" " \\frac{b_{ref}}{b_{ij}}\\right]$$"
 )
 
 if not df_rutas.empty:
@@ -151,26 +149,17 @@ if not df_rutas.empty:
   camino_optimo_nodos = optima_str.split("-")
   st.success(f"Óptimo recalculado: {optima_str}")
 
-# --- VISUALIZACIÓN INTERACTIVA CON PLOTLY ---
+# --- VISUALIZACIÓN INTERACTIVA DE LA RED ---
 st.subheader("Visualización Interactiva de la Red")
-st.markdown(
-    "🔵 *Azul: camino óptimo* · ⚪ *Gris: enlace activo* · *Pasa el cursor sobre"
-    " los enlaces para ver detalles.*"
-)
-
 pares_optimos = set(
     zip(camino_optimo_nodos[:-1], camino_optimo_nodos[1:])
 ).union(set(zip(camino_optimo_nodos[1:], camino_optimo_nodos[:-1])))
 
 edge_x, edge_y, edge_x_opt, edge_y_opt = [], [], [], []
-edge_text = []
-
 for u, v, data in G.edges(data=True):
   x0, y0 = POS[u]
   x1, y1 = POS[v]
-  es_opt = (u, v) in pares_optimos
-
-  if es_opt:
+  if (u, v) in pares_optimos:
     edge_x_opt.extend([x0, x1, None])
     edge_y_opt.extend([y0, y1, None])
   else:
@@ -184,7 +173,6 @@ trace_normal = go.Scatter(
     hoverinfo="none",
     mode="lines",
 )
-
 trace_opt = go.Scatter(
     x=edge_x_opt,
     y=edge_y_opt,
@@ -199,12 +187,9 @@ for node in G.nodes():
   node_x.append(x)
   node_y.append(y)
   node_text.append(node)
-  if node == ORIGEN:
-    node_color.append("#2ecc71")
-  elif node == DESTINO:
-    node_color.append("#e67e22")
-  else:
-    node_color.append("#3498db")
+  node_color.append(
+      "#2ecc71" if node == ORIGEN else "#e67e22" if node == DESTINO else "#3498db"
+  )
 
 node_trace = go.Scatter(
     x=node_x,
@@ -212,7 +197,6 @@ node_trace = go.Scatter(
     mode="markers+text",
     text=node_text,
     textposition="bottom center",
-    hoverinfo="text",
     marker=dict(color=node_color, size=30, line=dict(width=2, color="#fff")),
 )
 
@@ -224,14 +208,16 @@ fig = go.Figure(
         margin=dict(b=20, l=5, r=5, t=10),
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        height=450,
+        height=400,
     ),
 )
 st.plotly_chart(fig, use_container_width=True)
 
-# --- SINK TREE ---
+# --- SINK TREE CON GRAFO DIRIGIDO Y TABLA ---
 st.subheader(f"3. Sink Tree hacia {DESTINO}")
+sink_edges_x, sink_edges_y = [], []
 sink_data = []
+
 if nx.has_path(G, ORIGEN, DESTINO):
   for node in G.nodes():
     if node != DESTINO and nx.has_path(G, node, DESTINO):
@@ -245,5 +231,26 @@ if nx.has_path(G, ORIGEN, DESTINO):
               "Costo acumulado": costo_ac,
           }
       )
-  if sink_data:
-    st.dataframe(pd.DataFrame(sink_data), use_container_width=True)
+      # Coordenadas para las flechas del Sink Tree
+      x0, y0 = POS[node]
+      x1, y1 = POS[siguiente]
+      sink_edges_x.extend([x0, x1, None])
+      sink_edges_y.extend([y0, y1, None])
+
+# Grafo visual del Sink Tree
+trace_sink_edges = go.Scatter(
+    x=sink_edges_x,
+    y=sink_edges_y,
+    line=dict(width=3, color="#2ecc71"),
+    mode="lines+markers",
+    marker=dict(size=[10 if i % 3 == 2 else 0 for i in range(len(sink_edges_x))]),
+)
+
+fig_sink = go.Figure(
+    data=[trace_normal, trace_sink_edges, node_trace],
+    layout=go.Layout(
+        showlegend=False,
+        hovermode="closest",
+        margin=dict(b=20, l=5, r=5, t=10),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, show
