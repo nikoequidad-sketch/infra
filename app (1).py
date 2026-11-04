@@ -1,20 +1,15 @@
-import streamlit as st
+"""Optimalidad y Sink Tree en Streamlit (modelo del informe, Johal 2008)."""
+
 import networkx as nx
 import pandas as pd
-import streamlit.components.v1 as components
-from pyvis.network import Network
-
-# =========================================================
-# CONFIGURACIÓN
-# =========================================================
+import plotly.graph_objects as go
+import streamlit as st
 
 st.set_page_config(
-    page_title="Optimalidad y Sink Tree - Lab",
-    layout="wide"
+    page_title="Optimalidad y Sink Tree - Lab", layout="wide"
 )
 
-ORIGEN = "H"
-DESTINO = "B"
+ORIGEN, DESTINO = "H", "B"
 
 ENLACES = [
     ("H-D", 8, 100),
@@ -53,485 +48,217 @@ MODOS = [
     "Multicriterio ponderado",
 ]
 
-# =========================================================
-# FUNCIONES
-# =========================================================
 
 def construir_grafo(df):
+  g = nx.Graph()
+  for _, r in df.iterrows():
+    if r["Disponible"] and r["Retardo (ms)"] > 0 and r["Capacidad (Mbps)"] > 0:
+      u, v = r["Enlace"].split("-")
+      g.add_edge(
+          u, v, retardo=float(r["Retardo (ms)"]), banda=float(r["Capacidad (Mbps)"])
+      )
+  return g
 
-    G = nx.Graph()
-
-    for _, r in df.iterrows():
-
-        if (
-            r["Disponible"]
-            and r["Retardo (ms)"] > 0
-            and r["Capacidad (Mbps)"] > 0
-        ):
-
-            u, v = r["Enlace"].split("-")
-
-            G.add_edge(
-                u,
-                v,
-                retardo=float(r["Retardo (ms)"]),
-                banda=float(r["Capacidad (Mbps)"])
-            )
-
-    return G
-
-
-def evaluar_camino(path, G):
-
-    saltos = len(path) - 1
-    retardo = 0
-    banda = float("inf")
-
-    for u, v in zip(path[:-1], path[1:]):
-
-        if not G.has_edge(u, v):
-            return None
-
-        retardo += G[u][v]["retardo"]
-
-        banda = min(
-            banda,
-            G[u][v]["banda"]
-        )
-
-    return saltos, retardo, banda
-
-
-def calcular_costo(path, G, criterio, alpha, beta, gamma):
-
-    resultado = evaluar_camino(path, G)
-
-    if resultado is None:
-        return None
-
-    saltos, retardo, banda = resultado
-
-    if criterio == "Johal: mínimo de saltos":
-
-        return float(saltos)
-
-    elif criterio == "Mínimo retardo":
-
-        return float(retardo)
-
-    else:
-
-        return (
-            alpha * (saltos / 5)
-            + beta * (retardo / 50)
-            + gamma * (100 / banda)
-        )
-
-
-def mostrar_grafo_interactivo(
-    G,
-    posiciones,
-    aristas_resaltadas=None,
-    aristas_sink=None,
-    dirigido=False
-):
-
-    aristas_resaltadas = aristas_resaltadas or set()
-    aristas_sink = aristas_sink or []
-
-    net = Network(
-        height="520px",
-        width="100%",
-        directed=dirigido,
-        bgcolor="#ffffff",
-        font_color="#263238",
-        cdn_resources="in_line"
-    )
-
-    # NODOS
-
-    for nodo in G.nodes():
-
-        x, y = posiciones.get(nodo, (0, 0))
-
-        if nodo == ORIGEN:
-            color = "#2ecc71"
-
-        elif nodo == DESTINO:
-            color = "#e67e22"
-
-        else:
-            color = "#3498db"
-
-        net.add_node(
-            nodo,
-            label=nodo,
-            x=x * 150,
-            y=-y * 150,
-            physics=False,
-            fixed=False,
-            color=color,
-            size=28,
-            borderWidth=2,
-            font={
-                "size": 20,
-                "color": "#263238",
-                "face": "Arial"
-            }
-        )
-
-    # ARISTAS
-
-    if dirigido:
-
-        for u, v in aristas_sink:
-
-            net.add_edge(
-                u,
-                v,
-                color="#2ecc71",
-                width=4,
-                arrows="to",
-                smooth=False
-            )
-
-    else:
-
-        for u, v in G.edges():
-
-            es_optima = frozenset((u, v)) in aristas_resaltadas
-
-            net.add_edge(
-                u,
-                v,
-                color="#e74c3c" if es_optima else "#7f8c8d",
-                width=5 if es_optima else 2,
-                smooth=False
-            )
-
-    net.set_options("""
-    {
-        "physics": {
-            "enabled": false
-        },
-        "interaction": {
-            "dragNodes": true,
-            "dragView": true,
-            "zoomView": true,
-            "hover": true,
-            "navigationButtons": true
-        },
-        "nodes": {
-            "borderWidth": 2,
-            "shadow": true
-        },
-        "edges": {
-            "smooth": false,
-            "hoverWidth": 2
-        }
-    }
-    """)
-
-    html = net.generate_html()
-
-    components.html(
-        html,
-        height=540,
-        scrolling=False
-    )
-
-
-# =========================================================
-# TÍTULO
-# =========================================================
 
 st.title("Laboratorio: Optimalidad y Sink Tree")
-
 st.markdown(
-    "Basado en Johal (2008) | Origen H | Destino B"
+    "Basado en Johal (2008) · Origen H, destino B · Datos en ms y Mbps de"
+    " ejemplo"
 )
-
-# =========================================================
-# DATOS INICIALES
-# =========================================================
 
 if "df_enlaces" not in st.session_state:
-
-    st.session_state.df_enlaces = pd.DataFrame(
-        [
-            {
-                "Enlace": e[0],
-                "Retardo (ms)": e[1],
-                "Capacidad (Mbps)": e[2],
-                "Disponible": True
-            }
-            for e in ENLACES
-        ]
-    )
-
-# =========================================================
-# PANEL LATERAL
-# =========================================================
+  st.session_state.df_enlaces = pd.DataFrame(
+      [
+          {
+              "Enlace": e[0],
+              "Retardo (ms)": e[1],
+              "Capacidad (Mbps)": e[2],
+              "Disponible": True,
+          }
+          for e in ENLACES
+      ]
+  )
 
 st.sidebar.header("Función objetivo")
+criterio = st.sidebar.selectbox("Criterio", MODOS)
 
-criterio = st.sidebar.selectbox(
-    "Selecciona el criterio",
-    MODOS
-)
+st.sidebar.subheader("Pesos (multicriterio)")
+alpha = st.sidebar.slider("α (saltos)", 0.0, 1.0, 0.5)
+beta = st.sidebar.slider("β (retardo)", 0.0, 1.0, 0.35)
+gamma = st.sidebar.slider("γ (baja capacidad)", 0.0, 1.0, 0.15)
 
-st.sidebar.subheader("Pesos multicriterio")
-
-alpha = st.sidebar.slider(
-    "α (saltos)", 0.0, 1.0, 0.50
-)
-
-beta = st.sidebar.slider(
-    "β (retardo)", 0.0, 1.0, 0.35
-)
-
-gamma = st.sidebar.slider(
-    "γ (capacidad)", 0.0, 1.0, 0.15
-)
-
-if criterio == "Multicriterio ponderado":
-
-    st.sidebar.caption(
-        f"Suma de pesos: {alpha + beta + gamma:.2f}"
-    )
-
-# =========================================================
-# TABLA DE ENLACES
-# =========================================================
+df = st.session_state.df_enlaces
+G = construir_grafo(df)
 
 st.subheader("1. Tabla de enlaces")
+st.dataframe(df, use_container_width=True)
 
-df_editado = st.data_editor(
-    st.session_state.df_enlaces,
-    use_container_width=True,
-    hide_index=True,
-    key="editor_enlaces",
-    column_config={
-        "Disponible": st.column_config.CheckboxColumn(
-            "Disponible",
-            default=True
-        ),
-        "Retardo (ms)": st.column_config.NumberColumn(
-            "Retardo (ms)",
-            min_value=0.1
-        ),
-        "Capacidad (Mbps)": st.column_config.NumberColumn(
-            "Capacidad (Mbps)",
-            min_value=0.1
-        )
-    }
-)
 
-st.session_state.df_enlaces = df_editado.copy()
+def evaluar_camino(path, G_net):
+  saltos = len(path) - 1
+  retardo_total = 0
+  banda_minima = float("inf")
+  for i in range(len(path) - 1):
+    u, v = path[i], path[i + 1]
+    if G_net.has_edge(u, v):
+      d_val = G_net[u][v]["retardo"]
+      b_val = G_net[u][v]["banda"]
+      retardo_total += d_val
+      if b_val < banda_minima:
+        banda_minima = b_val
+    else:
+      return None
+  return saltos, retardo_total, banda_minima
 
-G = construir_grafo(st.session_state.df_enlaces)
 
-# =========================================================
-# RUTAS ESTÁTICAS Y ÓPTIMAS
-# =========================================================
+resultados_estaticos = []
+camino_optimo_nodos = ["H", "D", "A", "B"]
 
-st.subheader("2. Comparación de rutas")
+for nombre_ruta, path in RUTAS.items():
+  res = evaluar_camino(path, G)
+  if res:
+    s, r, b = res
+    resultados_estaticos.append(
+        {
+            "Ruta": nombre_ruta,
+            "Camino": "-".join(path),
+            "Disponible": True,
+            "Saltos H(P)": s,
+            "Retardo D(P) ms": r,
+            "Banda B(P) Mbps": b,
+            "Costo C(P)": round(
+                alpha * (s / 3) + beta * (r / 30) + gamma * (100 / b), 3
+            ),
+        }
+    )
 
+df_rutas = pd.DataFrame(resultados_estaticos)
+
+st.subheader("2. Ruta estática vs. ruta óptima")
 st.markdown(
-    r"""
-    **Funciones de evaluación**
-
-    $$H(P)=\sum_{(i,j)\in P}1$$
-
-    $$D(P)=\sum_{(i,j)\in P}d_{ij}$$
-
-    $$B(P)=\min_{(i,j)\in P}b_{ij}$$
-
-    $$C(P)=\alpha\frac{H(P)}{5}
-    +\beta\frac{D(P)}{50}
-    +\gamma\frac{100}{B(P)}$$
-    """
+    "$$G = (V,E), \\quad H(P) = \\sum_{(i,j)\\in P} h_{ij}, h_{ij} = 1$$"
 )
-
-resultados = []
-
-for nombre, path in RUTAS.items():
-
-    res = evaluar_camino(path, G)
-
-    if res is not None:
-
-        saltos, retardo, banda = res
-
-        costo = calcular_costo(
-            path,
-            G,
-            criterio,
-            alpha,
-            beta,
-            gamma
-        )
-
-        resultados.append({
-            "Ruta": nombre,
-            "Camino": " - ".join(path),
-            "Saltos": saltos,
-            "Retardo (ms)": retardo,
-            "Capacidad (Mbps)": banda,
-            "Costo": round(costo, 3)
-        })
-
-df_rutas = pd.DataFrame(resultados)
-
-camino_optimo = []
+st.markdown(
+    "$$D(P) = \\sum d_{ij}, \\quad B(P) = \\min b_{ij}, \\quad C(P) ="
+    " \\sum \\left[\\alpha \\frac{d_{ij}}{d_{ref}} + \\gamma"
+    " \\frac{b_{ref}}{b_{ij}}\\right]$$"
+)
 
 if not df_rutas.empty:
+  st.dataframe(df_rutas, use_container_width=True)
+  best_idx = df_rutas["Costo C(P)"].idxmin()
+  optima_str = df_rutas.loc[best_idx]["Camino"]
+  camino_optimo_nodos = optima_str.split("-")
+  st.success(f"Óptimo recalculado: {optima_str}")
 
-    st.dataframe(
-        df_rutas,
-        use_container_width=True,
-        hide_index=True
-    )
+# --- VISUALIZACIÓN INTERACTIVA DE LA RED ---
+st.subheader("Visualización Interactiva de la Red")
+pares_optimos = set(
+    zip(camino_optimo_nodos[:-1], camino_optimo_nodos[1:])
+).union(set(zip(camino_optimo_nodos[1:], camino_optimo_nodos[:-1])))
 
-    idx = df_rutas["Costo"].idxmin()
+edge_x, edge_y, edge_x_opt, edge_y_opt = [], [], [], []
+for u, v, data in G.edges(data=True):
+  x0, y0 = POS[u]
+  x1, y1 = POS[v]
+  if (u, v) in pares_optimos:
+    edge_x_opt.extend([x0, x1, None])
+    edge_y_opt.extend([y0, y1, None])
+  else:
+    edge_x.extend([x0, x1, None])
+    edge_y.extend([y0, y1, None])
 
-    camino_optimo = RUTAS[
-        df_rutas.loc[idx, "Ruta"]
-    ]
-
-    st.success(
-        f"Ruta óptima: {' - '.join(camino_optimo)}"
-    )
-
-else:
-
-    st.warning(
-        "No hay rutas disponibles entre H y B."
-    )
-
-# =========================================================
-# VISUALIZACIÓN PRINCIPAL
-# =========================================================
-
-st.subheader("3. Visualización interactiva de la red")
-
-st.info(
-    "Puedes arrastrar los nodos, acercar, alejar "
-    "y desplazar el grafo."
+trace_normal = go.Scatter(
+    x=edge_x,
+    y=edge_y,
+    line=dict(width=2, color="#7f8c8d"),
+    hoverinfo="none",
+    mode="lines",
+)
+trace_opt = go.Scatter(
+    x=edge_x_opt,
+    y=edge_y_opt,
+    line=dict(width=4, color="#3498db"),
+    hoverinfo="none",
+    mode="lines",
 )
 
-pares_optimos = {
-    frozenset((u, v))
-    for u, v in zip(
-        camino_optimo[:-1],
-        camino_optimo[1:]
-    )
-}
+node_x, node_y, node_text, node_color = [], [], [], []
+for node in G.nodes():
+  x, y = POS[node]
+  node_x.append(x)
+  node_y.append(y)
+  node_text.append(node)
+  node_color.append(
+      "#2ecc71" if node == ORIGEN else "#e67e22" if node == DESTINO else "#3498db"
+  )
 
-mostrar_grafo_interactivo(
-    G,
-    POS,
-    aristas_resaltadas=pares_optimos
+node_trace = go.Scatter(
+    x=node_x,
+    y=node_y,
+    mode="markers+text",
+    text=node_text,
+    textposition="bottom center",
+    marker=dict(color=node_color, size=30, line=dict(width=2, color="#fff")),
 )
 
-# =========================================================
-# SINK TREE
-# =========================================================
+fig = go.Figure(
+    data=[trace_normal, trace_opt, node_trace],
+    layout=go.Layout(
+        showlegend=False,
+        hovermode="closest",
+        margin=dict(b=20, l=5, r=5, t=10),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        height=400,
+    ),
+)
+st.plotly_chart(fig, use_container_width=True)
 
-st.subheader("4. Sink Tree hacia B")
-
+# --- SINK TREE CON GRAFO DIRIGIDO Y TABLA ---
+st.subheader(f"3. Sink Tree hacia {DESTINO}")
+sink_edges_x, sink_edges_y = [], []
 sink_data = []
-sink_edges = []
 
-if DESTINO in G and ORIGEN in G and nx.has_path(G, ORIGEN, DESTINO):
+if nx.has_path(G, ORIGEN, DESTINO):
+  for node in G.nodes():
+    if node != DESTINO and nx.has_path(G, node, DESTINO):
+      path = nx.shortest_path(G, source=node, target=DESTINO, weight="retardo")
+      siguiente = path[1]
+      costo_ac = len(path) - 1
+      sink_data.append(
+          {
+              "Router": node,
+              "Siguiente salto hacia B": siguiente,
+              "Costo acumulado": costo_ac,
+          }
+      )
+      x0, y0 = POS[node]
+      x1, y1 = POS[siguiente]
+      sink_edges_x.extend([x0, x1, None])
+      sink_edges_y.extend([y0, y1, None])
 
-    for node in G.nodes():
+trace_sink_edges = go.Scatter(
+    x=sink_edges_x,
+    y=sink_edges_y,
+    line=dict(width=3, color="#2ecc71"),
+    mode="lines+markers",
+    marker=dict(size=[10 if i % 3 == 2 else 0 for i in range(len(sink_edges_x))]),
+)
 
-        if node == DESTINO:
-            continue
-
-        if nx.has_path(G, node, DESTINO):
-
-            path = nx.shortest_path(
-                G,
-                source=node,
-                target=DESTINO,
-                weight="retardo"
-            )
-
-            siguiente = path[1]
-
-            costo_retardo = nx.shortest_path_length(
-                G,
-                source=node,
-                target=DESTINO,
-                weight="retardo"
-            )
-
-            saltos = len(path) - 1
-
-            sink_data.append({
-                "Router": node,
-                "Siguiente salto hacia B": siguiente,
-                "Saltos acumulados": saltos,
-                "Retardo acumulado (ms)": costo_retardo
-            })
-
-            sink_edges.append((node, siguiente))
-
-    st.info(
-        "Árbol de encaminamiento dirigido hacia el destino B."
-    )
-
-    mostrar_grafo_interactivo(
-        G,
-        POS,
-        aristas_sink=sink_edges,
-        dirigido=True
-    )
-
-else:
-
-    st.warning(
-        "No existe conexión entre H y B."
-    )
-
-# =========================================================
-# TABLA SINK TREE
-# =========================================================
+fig_sink = go.Figure(
+    data=[trace_normal, trace_sink_edges, node_trace],
+    layout=go.Layout(
+        showlegend=False,
+        hovermode="closest",
+        margin=dict(b=20, l=5, r=5, t=10),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        height=400,
+    ),
+)
+st.plotly_chart(fig_sink, use_container_width=True)
 
 if sink_data:
-
-    st.subheader("5. Tabla de siguientes saltos")
-
-    df_sink = pd.DataFrame(sink_data)
-
-    st.dataframe(
-        df_sink,
-        use_container_width=True,
-        hide_index=True
-    )
-
-# =========================================================
-# LEYENDA
-# =========================================================
-
-st.divider()
-
-st.subheader("6. Leyenda")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("🟢 **H:** Nodo origen")
-
-with col2:
-    st.markdown("🟠 **B:** Nodo destino")
-
-with col3:
-    st.markdown("🔵 **Routers intermedios**")
-
-st.caption(
-    "Laboratorio de redes | Optimalidad y Sink Tree"
-)
+  st.dataframe(pd.DataFrame(sink_data), use_container_width=True)
 
