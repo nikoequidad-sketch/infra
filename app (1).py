@@ -94,7 +94,6 @@ st.subheader("1. Tabla de enlaces")
 st.dataframe(df, use_container_width=True)
 
 
-# --- CÁLCULOS DE RUTAS Y MÉTRICAS ---
 def evaluar_camino(path, G_net):
   saltos = len(path) - 1
   retardo_total = 0
@@ -113,6 +112,8 @@ def evaluar_camino(path, G_net):
 
 
 resultados_estaticos = []
+camino_optimo_nodos = ["H", "D", "A", "B"]
+
 for nombre_ruta, path in RUTAS.items():
   res = evaluar_camino(path, G)
   if res:
@@ -138,28 +139,111 @@ st.markdown(
     "$$G = (V,E), \\quad H(P) = \\sum_{(i,j)\\in P} h_{ij}, h_{ij} = 1$$"
 )
 st.markdown(
-    "$$D(P) = \\sum d_{ij}, \\quad B(P) = \\min b_{ij}, \\quad C(P) =" " \\sum \\left[\\alpha \\frac{d_{ij}}{d_{ref}} + \\gamma" " \\frac{b_{ref}}{b_{ij}}\\right]$$"
+    "$$D(P) = \\sum d_{ij}, \\quad B(P) = \\min b_{ij}, \\quad C(P) ="
+    " \\sum \\left[\\alpha \\frac{d_{ij}}{d_{ref}} + \\gamma"
+    " \\frac{b_{ref}}{b_{ij}}\\right]$$"
 )
 
 if not df_rutas.empty:
   st.dataframe(df_rutas, use_container_width=True)
-  optima = df_rutas.loc[df_rutas["Costo C(P)"].idxmin()]["Camino"]
-  st.success(f"Óptimo recalculado: {optima}")
+  best_idx = df_rutas["Costo C(P)"].idxmin()
+  optima_str = df_rutas.loc[best_idx]["Camino"]
+  camino_optimo_nodos = optima_str.split("-")
+  st.success(f"Óptimo recalculado: {optima_str}")
 
-# --- VISUALIZACIÓN GRAFO ---
+# --- VISUALIZACIÓN INTERACTIVA CON PLOTLY ---
 st.subheader("Visualización Interactiva de la Red")
-edge_x, edge_y = [], []
-for edge in G.edges(data=True):
-  x0, y0 = POS[edge[0]]
-  x1, y1 = POS[edge[1]]
-  edge_x.extend([x0, x1, None])
-  edge_y.extend([y0, y1, None])
+st.markdown(
+    "🔵 *Azul: camino óptimo* · ⚪ *Gris: enlace activo* · *Pasa el cursor sobre"
+    " los enlaces para ver detalles.*"
+)
 
-edge_trace = go.Scatter(
+pares_optimos = set(
+    zip(camino_optimo_nodos[:-1], camino_optimo_nodos[1:])
+).union(set(zip(camino_optimo_nodos[1:], camino_optimo_nodos[:-1])))
+
+edge_x, edge_y, edge_x_opt, edge_y_opt = [], [], [], []
+edge_text = []
+
+for u, v, data in G.edges(data=True):
+  x0, y0 = POS[u]
+  x1, y1 = POS[v]
+  es_opt = (u, v) in pares_optimos
+
+  if es_opt:
+    edge_x_opt.extend([x0, x1, None])
+    edge_y_opt.extend([y0, y1, None])
+  else:
+    edge_x.extend([x0, x1, None])
+    edge_y.extend([y0, y1, None])
+
+trace_normal = go.Scatter(
     x=edge_x,
     y=edge_y,
-    line=dict(width=2, color="#888"),
+    line=dict(width=2, color="#7f8c8d"),
     hoverinfo="none",
     mode="lines",
 )
-    
+
+trace_opt = go.Scatter(
+    x=edge_x_opt,
+    y=edge_y_opt,
+    line=dict(width=4, color="#3498db"),
+    hoverinfo="none",
+    mode="lines",
+)
+
+node_x, node_y, node_text, node_color = [], [], [], []
+for node in G.nodes():
+  x, y = POS[node]
+  node_x.append(x)
+  node_y.append(y)
+  node_text.append(node)
+  if node == ORIGEN:
+    node_color.append("#2ecc71")
+  elif node == DESTINO:
+    node_color.append("#e67e22")
+  else:
+    node_color.append("#3498db")
+
+node_trace = go.Scatter(
+    x=node_x,
+    y=node_y,
+    mode="markers+text",
+    text=node_text,
+    textposition="bottom center",
+    hoverinfo="text",
+    marker=dict(color=node_color, size=30, line=dict(width=2, color="#fff")),
+)
+
+fig = go.Figure(
+    data=[trace_normal, trace_opt, node_trace],
+    layout=go.Layout(
+        showlegend=False,
+        hovermode="closest",
+        margin=dict(b=20, l=5, r=5, t=10),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        height=450,
+    ),
+)
+st.plotly_chart(fig, use_container_width=True)
+
+# --- SINK TREE ---
+st.subheader(f"3. Sink Tree hacia {DESTINO}")
+sink_data = []
+if nx.has_path(G, ORIGEN, DESTINO):
+  for node in G.nodes():
+    if node != DESTINO and nx.has_path(G, node, DESTINO):
+      path = nx.shortest_path(G, source=node, target=DESTINO, weight="retardo")
+      siguiente = path[1]
+      costo_ac = len(path) - 1
+      sink_data.append(
+          {
+              "Router": node,
+              "Siguiente salto hacia B": siguiente,
+              "Costo acumulado": costo_ac,
+          }
+      )
+  if sink_data:
+    st.dataframe(pd.DataFrame(sink_data), use_container_width=True)
