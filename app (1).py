@@ -139,7 +139,9 @@ st.markdown(
     "$$G = (V,E), \\quad H(P) = \\sum_{(i,j)\\in P} h_{ij}, h_{ij} = 1$$"
 )
 st.markdown(
-    "$$D(P) = \\sum d_{ij}, \\quad B(P) = \\min b_{ij}, \\quad C(P) =" " \\sum \\left[\\alpha \\frac{d_{ij}}{d_{ref}} + \\gamma" " \\frac{b_{ref}}{b_{ij}}\\right]$$"
+    "$$D(P) = \\sum d_{ij}, \\quad B(P) = \\min b_{ij}, \\quad C(P) ="
+    " \\sum \\left[\\alpha \\frac{d_{ij}}{d_{ref}} + \\gamma"
+    " \\frac{b_{ref}}{b_{ij}}\\right]$$"
 )
 
 if not df_rutas.empty:
@@ -249,4 +251,13 @@ fig_sink = go.Figure(
     layout=go.Layout(
         showlegend=False,
         hovermode="closest",
-        margin=dict(b=
+        margin=dict(b=20, l=5, r=5, t=10),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        height=400,
+    ),
+)
+st.plotly_chart(fig_sink, use_container_width=True)
+
+if sink_data:
+  st.dataframe(pd.DataFrame(sink_data), use_container_width=True)
