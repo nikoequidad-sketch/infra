@@ -231,13 +231,11 @@ if nx.has_path(G, ORIGEN, DESTINO):
               "Costo acumulado": costo_ac,
           }
       )
-      # Coordenadas para las flechas del Sink Tree
       x0, y0 = POS[node]
       x1, y1 = POS[siguiente]
       sink_edges_x.extend([x0, x1, None])
       sink_edges_y.extend([y0, y1, None])
 
-# Grafo visual del Sink Tree
 trace_sink_edges = go.Scatter(
     x=sink_edges_x,
     y=sink_edges_y,
@@ -251,6 +249,4 @@ fig_sink = go.Figure(
     layout=go.Layout(
         showlegend=False,
         hovermode="closest",
-        margin=dict(b=20, l=5, r=5, t=10),
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        yaxis=dict(showgrid=False, zeroline=False, show
+        margin=dict(b=
