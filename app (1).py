@@ -1,3 +1,4 @@
+
 """Optimalidad y Sink Tree en Streamlit (modelo del informe, Johal 2008)."""
 
 import networkx as nx
@@ -42,7 +43,11 @@ POS = {
     "N": (2.6, -0.2),
 }
 
-MODOS = ["Mínimo de saltos", "Mínimo retardo", "Multicriterio"]
+MODOS = [
+    "Johal: mínimo de saltos",
+    "Mínimo retardo",
+    "Multicriterio ponderado",
+]
 
 
 def construir_grafo(df):
@@ -56,10 +61,10 @@ def construir_grafo(df):
   return g
 
 
-st.title("Guía de Laboratorio: Optimalidad y Sink Tree en Streamlit")
+st.title("Laboratorio: Optimalidad y Sink Tree")
 st.markdown(
-    "Demostración interactiva basada en el estudio de Hartinder Singh Johal"
-    " (2008)."
+    "Basado en Johal (2008) · Origen H, destino B · Datos en ms y Mbps de"
+    " ejemplo"
 )
 
 if "df_enlaces" not in st.session_state:
@@ -75,40 +80,85 @@ if "df_enlaces" not in st.session_state:
       ]
   )
 
-st.sidebar.header("Parámetros de Red")
-modo = st.sidebar.selectbox("Criterio de Optimización", MODOS)
+st.sidebar.header("Función objetivo")
+criterio = st.sidebar.selectbox("Criterio", MODOS)
 
-st.sidebar.subheader("Pesos Multicriterio")
-alpha = st.sidebar.slider("α (Saltos)", 0.0, 1.0, 0.5)
-beta = st.sidebar.slider("β (Retardo)", 0.0, 1.0, 0.35)
-gamma = st.sidebar.slider("γ (Baja Capacidad)", 0.0, 1.0, 0.15)
+st.sidebar.subheader("Pesos (multicriterio)")
+alpha = st.sidebar.slider("α (saltos)", 0.0, 1.0, 0.5)
+beta = st.sidebar.slider("β (retardo)", 0.0, 1.0, 0.35)
+gamma = st.sidebar.slider("γ (baja capacidad)", 0.0, 1.0, 0.15)
 
 df = st.session_state.df_enlaces
 G = construir_grafo(df)
-camino_optimo = (
-    ["H", "D", "A", "B"] if nx.has_path(G, "H", "B") else ["H", "E", "J", "C", "B"]
+
+st.subheader("1. Tabla de enlaces")
+st.dataframe(df, use_container_width=True)
+
+
+# --- CÁLCULOS DE RUTAS Y MÉTRICAS ---
+def evaluar_camino(path, G_net):
+  saltos = len(path) - 1
+  retardo_total = 0
+  banda_minima = float("inf")
+  for i in range(len(path) - 1):
+    u, v = path[i], path[i + 1]
+    if G_net.has_edge(u, v):
+      d_val = G_net[u][v]["retardo"]
+      b_val = G_net[u][v]["banda"]
+      retardo_total += d_val
+      if b_val < banda_minima:
+        banda_minima = b_val
+    else:
+      return None
+  return saltos, retardo_total, banda_minima
+
+
+# Evaluar rutas estáticas
+resultados_estaticos = []
+for nombre_ruta, path in RUTAS.items():
+  res = evaluar_camino(path, G)
+  if res:
+    s, r, b = res
+    resultados_estaticos.append(
+        {
+            "Ruta": nombre_ruta,
+            "Camino": "-".join(path),
+            "Disponible": True,
+            "Saltos H(P)": s,
+            "Retardo D(P) ms": r,
+            "Banda B(P) Mbps": b,
+            "Costo C(P)": round(
+                alpha * (s / 3) + beta * (r / 30) + gamma * (100 / b), 3
+            ),
+        }
+    )
+
+df_rutas = pd.DataFrame(resultados_estaticos)
+
+st.subheader("2. Ruta estática vs. ruta óptima")
+st.markdown(
+    "$$G = (V,E), \\quad H(P) = \\sum_{(i,j)\\in P} h_{ij}, h_{ij} = 1$$"
+)
+st.markdown(
+    "$$D(P) = \\sum d_{ij}, \\quad B(P) = \\min b_{ij}, \\quad C(P) =" " \\sum \\left[\\alpha \\frac{d_{ij}}{d_{ref}} + \\gamma" " \\frac{b_{ref}}{b_{ij}}\\right]$$"
 )
 
-st.subheader("Visualización Interactiva de la Red (Plotly)")
+if not df_rutas.empty:
+  st.dataframe(df_rutas, use_container_width=True)
+  optima = df_rutas.loc[df_rutas["Costo C(P)"].idxmin()]["Camino"]
+  st.success(f"Óptimo recalculado: {optima}")
 
-# Generar grafo interactivo con Plotly
-edge_x, edge_y, edge_text = [], [], []
+# --- VISUALIZACIÓN GRAFO ---
+st.subheader("Visualización Interactiva de la Red")
+edge_x, edge_y = [], []
 for edge in G.edges(data=True):
   x0, y0 = POS[edge[0]]
   x1, y1 = POS[edge[1]]
   edge_x.extend([x0, x1, None])
   edge_y.extend([y0, y1, None])
-  edge_text.append(
-      f"{edge[0]}-{edge[1]}: {edge[2].get('retardo')}ms,"
-      f" {edge[2].get('banda')}Mbps"
-  )
 
 edge_trace = go.Scatter(
-    x=edge_x,
-    y=edge_y,
-    line=dict(width=2, color="#888"),
-    hoverinfo="none",
-    mode="lines",
+    x=edge_x, y=edge_y, line=dict(width=2, color="#888"), mode="lines"
 )
 
 node_x, node_y, node_text, node_color = [], [], [], []
@@ -117,42 +167,13 @@ for node in G.nodes():
   node_x.append(x)
   node_y.append(y)
   node_text.append(node)
-  if node == "H":
-    node_color.append("#2ecc71")
-  elif node == "B":
-    node_color.append("#e67e22")
-  else:
-    node_color.append("#3498db")
+  node_color.append(
+      "#2ecc71" if node == ORIGEN else "#e67e22" if node == DESTINO else "#3498db"
+  )
 
 node_trace = go.Scatter(
     x=node_x,
     y=node_y,
     mode="markers+text",
     text=node_text,
-    textposition="bottom center",
-    hoverinfo="text",
-    marker=dict(
-        showscale=False,
-        color=node_color,
-        size=30,
-        line=dict(width=2, color="#fff"),
-    ),
-)
-
-fig = go.Figure(
-    data=[edge_trace, node_trace],
-    layout=go.Layout(
-        showlegend=False,
-        hovermode="closest",
-        margin=dict(b=20, l=5, r=5, t=40),
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        height=450,
-    ),
-)
-
-st.plotly_chart(fig, use_container_width=True)
-
-st.markdown("---")
-st.subheader("Tabla de Enlaces")
-st.dataframe(df, use_container_width=True)
+    textposition="bottom
