@@ -1,4 +1,3 @@
-
 """Optimalidad y Sink Tree en Streamlit (modelo del informe, Johal 2008)."""
 
 import networkx as nx
@@ -113,7 +112,6 @@ def evaluar_camino(path, G_net):
   return saltos, retardo_total, banda_minima
 
 
-# Evaluar rutas estáticas
 resultados_estaticos = []
 for nombre_ruta, path in RUTAS.items():
   res = evaluar_camino(path, G)
@@ -158,22 +156,5 @@ for edge in G.edges(data=True):
   edge_y.extend([y0, y1, None])
 
 edge_trace = go.Scatter(
-    x=edge_x, y=edge_y, line=dict(width=2, color="#888"), mode="lines"
-)
-
-node_x, node_y, node_text, node_color = [], [], [], []
-for node in G.nodes():
-  x, y = POS[node]
-  node_x.append(x)
-  node_y.append(y)
-  node_text.append(node)
-  node_color.append(
-      "#2ecc71" if node == ORIGEN else "#e67e22" if node == DESTINO else "#3498db"
-  )
-
-node_trace = go.Scatter(
-    x=node_x,
-    y=node_y,
-    mode="markers+text",
-    text=node_text,
-    textposition="bottom
+    x=edge_x, y=edge_y, line=dict
+    
