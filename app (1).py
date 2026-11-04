@@ -156,5 +156,10 @@ for edge in G.edges(data=True):
   edge_y.extend([y0, y1, None])
 
 edge_trace = go.Scatter(
-    x=edge_x, y=edge_y, line=dict
+    x=edge_x,
+    y=edge_y,
+    line=dict(width=2, color="#888"),
+    hoverinfo="none",
+    mode="lines",
+)
     
